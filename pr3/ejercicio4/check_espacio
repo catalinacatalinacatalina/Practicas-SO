@@ -1,0 +1,44 @@
+#!/bin/bash
+
+function usage {
+	echo Usage: $0
+}
+
+if [ $# -gt 0 ]; then
+	usage && exit -1
+fi
+
+if [ ! -f espacio.c ]; then
+	echo "error: no espacio.c file"
+	exit -1;
+fi
+
+for f in lstat readdir opendir closedir;
+do
+	if ! grep $f espacio.c > /dev/null; then
+		echo "error: not using $f"
+		exit -1
+	fi
+done
+
+if ! make > /dev/null; then
+	echo "error: compiling errors"
+	exit -1;
+fi
+
+./espacio ../* | sed 's/[[:space:]].*//' | tr 'k' 'K' > /tmp/output_espacio
+du -hs ../* | sed 's/[[:space:]].*//' > /tmp/output_du
+
+if ! diff /tmp/output_espacio /tmp/output_du; then
+	echo "error: output differs from du"
+	exit -1
+fi
+
+echo "Everything seems ok!"
+
+rm /tmp/output_espacio /tmp/output_du
+make clean > /dev/null
+
+exit 0
+
+

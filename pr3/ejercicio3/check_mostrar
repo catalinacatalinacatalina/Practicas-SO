@@ -1,0 +1,52 @@
+#!/bin/bash
+
+function usage {
+	echo Usage: $0
+}
+
+if [ $# -gt 0 ]; then
+	usage && exit -1
+fi
+
+if [ ! -f mostrar.c ]; then
+	echo "error: no mostrar.c file"
+	exit -1;
+fi
+
+for f in lseek;
+do
+	if ! grep $f mostrar.c > /dev/null; then
+		echo "error: not using $f"
+		exit -1
+	fi
+done
+
+if ! make > /dev/null; then
+	echo "error: compiling errors"
+	exit -1;
+fi
+
+./mostrar -n 30 mostrar.c > mostrar_n_30
+tail -c +31 mostrar.c > mostrar_n_30_tail
+
+if ! diff mostrar_n_30 mostrar_n_30_tail; then
+	echo "error: option -n does not work well"
+	exit -1
+fi
+
+./mostrar -n 30 -e mostrar.c > mostrar_en_30
+tail -c 30 mostrar.c > mostrar_en_30_tail
+
+if ! diff mostrar_en_30 mostrar_en_30_tail; then
+	echo "error: option -e does not work well"
+	exit -1
+fi
+
+echo "Everything seems ok!"
+
+rm mostrar_n_30 mostrar_n_30_tail mostrar_en_30 mostrar_en_30_tail
+make clean > /dev/null
+
+exit 0
+
+
