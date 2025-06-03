@@ -1,11 +1,10 @@
+#define _GNU_SOURCE	// para el WSL
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <string.h>
-
 #define BUFSIZE 512
 
 void copy(int fdo, int fdd) {
