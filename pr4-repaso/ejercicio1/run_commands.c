@@ -1,17 +1,11 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
 
-//preguntas
-/*
-    1.
 
-*/
-
-pid_t launch_command(char **argv) {
+pid_t launch_command(char** argv){
     pid_t pid = fork(); // Crear un proceso hijo
 
     if (pid == -1) {
@@ -29,9 +23,9 @@ pid_t launch_command(char **argv) {
         }
     }
 
-    // En el padre, retornamos el PID del proceso hijo
     return pid;
 }
+
 
 
 
@@ -96,15 +90,13 @@ int main(int argc, char *argv[]) {
     int cmd_argc;
     int i;
 
-
-    if (argc != 2) {
+    if (argc < 2) {
         fprintf(stderr, "Usage: %s \"command\"\n", argv[0]);
         return EXIT_FAILURE;
     }
 
     cmd_argv=parse_command(argv[1],&cmd_argc);
 
-    launch_command(cmd_argc);
     // Print parsed arguments
     printf("argc: %d\n", cmd_argc);
     for (i = 0; cmd_argv[i] != NULL; i++) {
