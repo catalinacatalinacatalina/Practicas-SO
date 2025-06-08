@@ -14,53 +14,32 @@
 
 int* raciones;
 sem_t *mutex, *sem_cocinar, *sem_lleno;
-int getServingsFromPot(void) {
-	int cogido = 0;
-	int avisado = 0;
-	while (!cogido) {
-		sem_wait(mutex); // entrar en sección crítica
-
-		if (*raciones == 0 && !avisado) {
-			printf("[SALVAJE %d] Caldero vacío, aviso al cocinero\n", getpid());
-			sem_post(sem_cocinar);  // avisar al cocinero que rellene
-			sem_wait(sem_lleno);    // esperar a que haya raciones
-			avisado = 1; // marcar que ya se ha avisado al cocinero
-		}
-
-		if (*raciones > 0) {
-			(*raciones)--;
-			printf("[SALVAJE %d] Coge ración, quedan %d\n", getpid(), *raciones);
-			sem_post(mutex); // salir de sección crítica
-			avisado = 0; // resetear aviso para el siguiente ciclo
-			cogido = 1; // ya he cogido mi ración
-		} else {
-			sem_post(mutex); // salir si no había raciones, para volver a intentar
-			// pequeño retardo para evitar busy wait muy agresivo
-			usleep(1000);
-		}
-	}
-	return 0;
+void getServingsFromPot(int id) {
+	sem_wait(mutex);
+    if (*raciones == 0) {
+        printf("[SALVAJE %d] El caldero está vacío. Avisando al cocinero...\n", id);
+        sem_post(sem_cocinar);
+        sem_wait(sem_lleno);
+    }
+    (*raciones)--;
+    printf("[SALVAJE %d] Ha tomado una ración. Raciones restantes: %d\n", id, *raciones);
+    sem_post(mutex);
 }
 
 
-void eat(void)
+void eat(int id)
 {
-	unsigned long id = (unsigned long) getpid();
-	printf("Savage %lu eating\n", id);
+
+	printf("[SALVAJE %d] Comiendo...\n", id);
 	sleep(rand() % 5);
 }
 
-void savages(void)
-{
-	for(int i=0; i<NUMITER; i++) {
-		getServingsFromPot();
-		eat();
-	}
-}
+
 
 int main(int argc, char *argv[])
 {
-	srand(time(NULL) ^ (getpid()<<16));
+
+
 	int shm_fd = shm_open(SHM_NAME, O_RDWR, 0666);
     if (shm_fd == -1) {
         perror("shm_open");
@@ -78,11 +57,20 @@ int main(int argc, char *argv[])
     sem_cocinar = sem_open(SEM_COCINAR, 0);
     sem_lleno = sem_open(SEM_LLENO, 0);
 
-    savages();
+	if (mutex == SEM_FAILED || sem_cocinar == SEM_FAILED || sem_lleno == SEM_FAILED) {
+		perror("sem_open");
+		exit(EXIT_FAILURE);
+	}
 
-    // Limpieza
-    munmap(raciones, sizeof(int));
-    close(shm_fd);
+	int id = getpid();
+	for(int i=0; i<NUMITER; i++) {
+		getServingsFromPot(id);
+		eat(id);
+	}
+    
+	
+	printf("[SALVAJE %d] Ha terminado.\n", id);
+
 
 	return 0;
 }

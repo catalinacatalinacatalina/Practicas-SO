@@ -6,9 +6,9 @@
 #define VIPSTR(vip) ((vip) ? "  vip  " : "not vip")
 #define MAXAFORO 10
 
-pthread_mutex_t mi_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond_vip = PTHREAD_COND_INITIALIZER;
-pthread_cond_t cond_normal = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mi_mutex;
+pthread_cond_t cond_vip;
+pthread_cond_t cond_normal;
 int aforo = 0;
 int max_aforo = MAXAFORO;
 int esperando_vip = 0;
@@ -40,45 +40,33 @@ void dance(int id, int isvip)
 
 void disco_exit(int id, int isvip)
 {
+	pthread_mutex_lock(&mi_mutex);
 	aforo--;
-	printf("CLIENTE %2d (%s) SALIENDO DE LA DISCOTECA, AFORO %d\n", id, VIPSTR(isvip), aforo);
-
-	// despertar hios que puedan entrar
-	if (esperando_vip > 0 ) {
-		pthread_cond_signal(&cond_vip);
-	} else{
-		pthread_cond_signal(&cond_normal);
-	}
+	printf("Client %2d (%s) exit disco\n", id, VIPSTR(isvip));
+	if (esperando_vip > 0)
+		pthread_cond_broadcast(&cond_vip);
+	else
+		pthread_cond_broadcast(&cond_normal);
+	pthread_mutex_unlock(&mi_mutex);
 }
 
 void *client(void *arg)
 {
     client_arg_t *info = (client_arg_t *)arg;
-	pthread_mutex_lock(&mi_mutex);
+	//pthread_mutex_lock(&mi_mutex);
 
-	if (info->isvip) {
-        esperando_vip++;
-        while (aforo >= max_aforo) {
-            pthread_cond_wait(&cond_vip, &mi_mutex);
-        }
-        esperando_vip--;
-        enter_vip_client(info->id);
-    } else {
-        esperando_normal++;
-        // Espera si aforo completo o hay vips esperando
-        while (aforo >= max_aforo || esperando_vip > 0) {
-            pthread_cond_wait(&cond_normal, &mi_mutex);
-        }
-        esperando_normal--;
-        enter_normal_client(info->id);
-    }
-	pthread_mutex_unlock(&mi_mutex);
-
+	if (info->isvip == 1)
+	{
+		enter_vip_client(info->id);
+	}
+	else
+	{
+		enter_normal_client(info->id);
+	}
     dance(info->id, info->isvip);
 
-    pthread_mutex_lock(&mi_mutex);
     disco_exit(info->id, info->isvip);
-    pthread_mutex_unlock(&mi_mutex);
+    //pthread_mutex_unlock(&mi_mutex);
 
     free(info);
 }
@@ -87,13 +75,15 @@ int main(int argc, char *argv[])
 {
     FILE *fp ;
 	pthread_mutex_init(&mi_mutex, NULL);
+	pthread_cond_init(&cond_vip, NULL);
+	pthread_cond_init(&cond_normal, NULL);
 
-	if((fp=fopen("ejemplo.txt", "r"))==NULL) {	return 1;}
+	if((fp=fopen("ejemplo.txt", "r"))==NULL) {return 1;}
+	
 	int num;
 	fscanf(fp, "%d", &num);
 
 
-	int vip;
 	printf("Number of clients: %d\n", num);
 	pthread_t threads[num];
 	for	(int i = 0; i < num; i++) {
@@ -103,7 +93,15 @@ int main(int argc, char *argv[])
         client_arg_t *arg = malloc(sizeof(client_arg_t));
         arg->id = i;
         arg->isvip = (vip_char == '1') ? 1 : 0;
-        pthread_create(&threads[i], NULL, client, arg);
+        if(pthread_create(&threads[i], NULL, client, arg)!= 0) {
+			perror("Error creating thread");
+			free(arg);
+			fclose(fp);
+			pthread_mutex_destroy(&mi_mutex);
+			pthread_cond_destroy(&cond_vip);
+			pthread_cond_destroy(&cond_normal);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	for	(int i = 0; i < num; i++) {
