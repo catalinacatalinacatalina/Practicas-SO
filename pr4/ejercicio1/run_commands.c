@@ -1,45 +1,32 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <getopt.h>
+#include <errno.h>
 
-//preguntas
-/*
-    1.
-
-*/
-
-pid_t launch_command(char **argv) {
-    pid_t pid = fork(); // Crear un proceso hijo
-
+pid_t launch_command(char** argv) {
+    pid_t pid = fork();
     if (pid == -1) {
-        perror("fork failed");
+        perror("fork");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // Proceso hijo
+        execvp(argv[0], argv);
+        perror("execvp");
         exit(EXIT_FAILURE);
     }
-
-    if (pid == 0) { // Si estamos en el hijo
-        printf("Launching command: %s\n", argv[0]);
-
-        // Ejecutar el comando utilizando execvp
-        if (execvp(argv[0], argv) == -1) {
-            perror("execvp fallado");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    // En el padre, retornamos el PID del proceso hijo
+    // Proceso padre retorna el PID del hijo
     return pid;
 }
 
-
-
-char **parse_command(const char *cmd, int* argc) {
-    // Allocate space for the argv array (initially with space for 10 args)
+char **parse_command(const char *cmd, int *argc) {
     size_t argv_size = 10;
     const char *end;
-    size_t arg_len; 
+    size_t arg_len;
     int arg_count = 0;
     const char *start = cmd;
     char **argv = malloc(argv_size * sizeof(char *));
@@ -49,11 +36,10 @@ char **parse_command(const char *cmd, int* argc) {
         exit(EXIT_FAILURE);
     }
 
-    while (*start && isspace(*start)) start++; // Skip leading spaces
+    while (*start && isspace(*start)) start++;
 
     while (*start) {
-        // Reallocate more space if needed
-        if (arg_count >= argv_size - 1) {  // Reserve space for the NULL at the end
+        if (arg_count >= argv_size - 1) {
             argv_size *= 2;
             argv = realloc(argv, argv_size * sizeof(char *));
             if (argv == NULL) {
@@ -62,11 +48,9 @@ char **parse_command(const char *cmd, int* argc) {
             }
         }
 
-        // Find the start of the next argument
         end = start;
         while (*end && !isspace(*end)) end++;
 
-        // Allocate space and copy the argument
         arg_len = end - start;
         argv[arg_count] = malloc(arg_len + 1);
 
@@ -75,44 +59,105 @@ char **parse_command(const char *cmd, int* argc) {
             exit(EXIT_FAILURE);
         }
         strncpy(argv[arg_count], start, arg_len);
-        argv[arg_count][arg_len] = '\0';  // Null-terminate the argument
+        argv[arg_count][arg_len] = '\0';
         arg_count++;
 
-        // Move to the next argument, skipping spaces
         start = end;
         while (*start && isspace(*start)) start++;
     }
 
-    argv[arg_count] = NULL; // Null-terminate the array
-
-    (*argc)=arg_count; // Return argc
+    argv[arg_count] = NULL;
+    (*argc) = arg_count;
 
     return argv;
 }
 
+void execute_commands_from_file(const char *filename, int run_in_background) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    char line[1024];
+    pid_t pids[1024];
+    int command_count = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+        int argc;
+        char **argv = parse_command(line, &argc);
+
+        printf("@@ Running command #%d: %s\n", command_count, line);
+
+        pids[command_count] = launch_command(argv);
+
+        if (!run_in_background) {
+            int status;
+            waitpid(pids[command_count], &status, 0);
+            printf("@@ Command #%d terminated (pid: %d, status: %d)\n", command_count, pids[command_count], WEXITSTATUS(status));
+        }
+
+        for (int i = 0; i < argc; i++) {
+            free(argv[i]);
+        }
+        free(argv);
+
+        command_count++;
+    }
+
+    if (run_in_background) {
+        for (int i = 0; i < command_count; i++) {
+            int status;
+            pid_t pid = waitpid(pids[i], &status, 0);
+            printf("@@ Command #%d terminated (pid: %d, status: %d)\n", i, pid, WEXITSTATUS(status));
+        }
+    }
+
+    fclose(file);
+}
 
 int main(int argc, char *argv[]) {
-    char **cmd_argv;
-    int cmd_argc;
-    int i;
+    int opt;
+    int run_in_background = 0;
+    char *single_command = NULL;
+    char *file_with_commands = NULL;
 
-
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s \"command\"\n", argv[0]);
-        return EXIT_FAILURE;
+    while ((opt = getopt(argc, argv, "x:s:b")) != -1) {
+        switch (opt) {
+            case 'x':
+                single_command = optarg;
+                break;
+            case 's':
+                file_with_commands = optarg;
+                break;
+            case 'b':
+                run_in_background = 1;
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-x command] [-s file] [-b]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
     }
 
-    cmd_argv=parse_command(argv[1],&cmd_argc);
+    if (single_command) {
+        int cmd_argc;
+        char **cmd_argv = parse_command(single_command, &cmd_argc);
 
-    launch_command(cmd_argc);
-    // Print parsed arguments
-    printf("argc: %d\n", cmd_argc);
-    for (i = 0; cmd_argv[i] != NULL; i++) {
-        printf("argv[%d]: %s\n", i, cmd_argv[i]);
-        free(cmd_argv[i]);  // Free individual argument
+        pid_t pid = launch_command(cmd_argv);
+        int status;
+        waitpid(pid, &status, 0);
+        printf("@@ Command terminated (pid: %d, status: %d)\n", pid, WEXITSTATUS(status));
+
+        for (int i = 0; i < cmd_argc; i++) {
+            free(cmd_argv[i]);
+        }
+        free(cmd_argv);
     }
 
-    free(cmd_argv);  // Free the cmd_argv array
+    if (file_with_commands) {
+        execute_commands_from_file(file_with_commands, run_in_background);
+    }
 
     return EXIT_SUCCESS;
 }

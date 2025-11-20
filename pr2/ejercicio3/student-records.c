@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "Usage: %s [ -h ]\n", argv[0]);
 			exit(EXIT_SUCCESS);
 		case 'i':
-			options.input_file = optarg;
+			//options.input_file = optarg;
 			break;
 		
 		/**
