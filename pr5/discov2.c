@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define CAPACITY 10
 #define VIPSTR(vip) ((vip) ? "  vip  " : "not vip")
@@ -15,15 +18,9 @@ int vip_waiting = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t esperar_turno = PTHREAD_COND_INITIALIZER;
 
-typedef struct {
-    int id;
-    int isvip;
-} client_arg_t;
-
-
 void enter_vip_client(int id)
 {
-	pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);
     int turno = ++dispensador_turnos_vip;
     vip_waiting++;
     
@@ -43,19 +40,20 @@ void enter_vip_client(int id)
 
 void enter_normal_client(int id)
 {
-	pthread_mutex_lock(&mutex);
-	int turno = ++dispensador_turnos;
-	
-	while (current_ocupancy >= CAPACITY || turno != turno_actual || vip_waiting > 0) {
+    pthread_mutex_lock(&mutex);
+    int turno = ++dispensador_turnos;
+
+    while (current_ocupancy >= CAPACITY || turno != turno_actual || vip_waiting > 0) {
         pthread_cond_wait(&esperar_turno, &mutex);
     }
-	turno_actual++;
-	printf("CLIENTE NORMAL DISCOTECA %2d ENTRA\n", id);
-	current_ocupancy++;
-	pthread_cond_broadcast(&esperar_turno);
-	pthread_mutex_unlock(&mutex);
-}
+    turno_actual++;
+    current_ocupancy++;
 
+	printf("\n");
+    printf("Ha entrado el cliente normal: %d. Hay una capacidad de: %d\n", id, current_ocupancy);
+    pthread_cond_broadcast(&esperar_turno);
+    pthread_mutex_unlock(&mutex);
+}
 
 void dance(int id, int isvip)
 {
@@ -66,61 +64,67 @@ void dance(int id, int isvip)
 void disco_exit(int id, int isvip)
 {
 	pthread_mutex_lock(&mutex);
-	current_ocupancy--;
+    current_ocupancy--;
 	printf("Client %2d (%s) exit. Capacity: %d\n", id, VIPSTR(isvip), current_ocupancy);
-	pthread_cond_broadcast(&esperar_turno);
-	pthread_mutex_unlock(&mutex);
+    pthread_cond_broadcast(&esperar_turno);
+    pthread_mutex_unlock(&mutex);
 }
 
 void *client(void *arg)
 {
-	client_arg_t *info = (client_arg_t *)arg;
-	if (info->isvip == 1)
-	{
-        enter_vip_client(info->id);
-	}
-    else
-	{
-        enter_normal_client(info->id);
-	}
-    dance(info->id, info->isvip);
-	disco_exit(info->id, info->isvip);
-    free(info);
+	int id = ((int*)arg)[0];
+	int esvip = ((int*)arg)[1];
+
+	if(esvip)
+		enter_vip_client(id);
+	else
+		enter_normal_client(id);
+	dance(id, esvip);
+
+	disco_exit(id, esvip);
 }
 
 int main(int argc, char *argv[])
 {
-    FILE *fp ;
-	pthread_mutex_init(&mutex, NULL);
-	pthread_cond_init(&esperar_turno, NULL);
+	FILE *fp ;
 
-	if((fp=fopen("ejemplo.txt", "r"))==NULL) {return 1;}
-	
+	if(!(fp = fopen(argv[1], "r"))){
+		return EXIT_FAILURE;
+	}
 	int num;
-	fscanf(fp, "%d", &num);
-	printf("Numero de clientes: %d\n", num);
-	
+	if(fscanf(fp, "%d", &num)!=1){
+		fclose(fp);
+		return EXIT_FAILURE;
+	}
 	pthread_t threads[num];
-	int cliente;
-	for (int i = 0; i < num; i++) {
-		fscanf(fp, "%d", &cliente);
-		
-		client_arg_t *arg = malloc(sizeof(client_arg_t));
-        arg->id = i;
-		arg->isvip= cliente;
 
-		//crear hilo
-		if(pthread_create(&threads[i], NULL ,client,arg)){
-			perror("error al crear hilo");
+	for (int i = 0; i < num; i++) {
+		int *args = malloc(2*sizeof(int));
+		if(!args){
+			fclose(fp);
 			return EXIT_FAILURE;
 		}
 
+		args[0]=i+1;
+		if(fscanf(fp, "%d", &args[1])!=1){
+			free(args);
+			fclose(fp);
+			return EXIT_FAILURE;
+		}
+
+		if(pthread_create(&threads[i], NULL, client, args)!=0){
+            perror("error al crear hilo");
+			free(args);
+			fclose(fp);
+			return EXIT_FAILURE;
+		}
 	}
 
+    
 	for(int i = 0; i<num; i++){
-		pthread_join(threads[i], NULL);	
-	}	
-	fclose(fp);
+        pthread_join(threads[i], NULL);
+	}
+    fclose(fp);
 	pthread_mutex_destroy(&mutex);
 	pthread_cond_destroy(&esperar_turno);
 
