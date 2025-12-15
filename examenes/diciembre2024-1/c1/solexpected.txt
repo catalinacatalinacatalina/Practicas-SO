@@ -1,0 +1,63 @@
+Cleaning thread waiting to enter disco
+Starting client 2
+Client 2 ( vip ) entering the disco
+Client 2 ( vip ) dancing in disco
+Starting client 0
+Client 0 (not vip) entering the disco
+Client 0 (not vip) dancing in disco
+Starting client 3
+Client 3 (not vip) entering the disco
+Client 3 (not vip) dancing in disco
+Starting client 4
+Client 4 ( vip ) waiting on the queue
+Starting client 1
+Client 1 (not vip) waiting on the queue
+Starting client 5
+Client 5 (not vip) waiting on the queue
+Starting client 6
+Client 6 (not vip) waiting on the queue
+Starting client 7
+Client 7 ( vip ) waiting on the queue
+Starting client 8
+Client 8 (not vip) waiting on the queue
+Starting client 9
+Client 9 ( vip ) waiting on the queue
+Client 0 (not vip) exits the disco
+Client 4 ( vip ) waiting on the queue
+Client 7 ( vip ) waiting on the queue
+Client 9 ( vip ) waiting on the queue
+Client 2 ( vip ) exits the disco
+Client 4 ( vip ) waiting on the queue
+Client 7 ( vip ) waiting on the queue
+Client 9 ( vip ) waiting on the queue
+Client 3 (not vip) exits the disco
+Cleaning...
+Client 4 ( vip ) waiting on the queue
+Client 9 ( vip ) waiting on the queue
+Client 7 ( vip ) waiting on the queue
+Done!
+Cleaning thread waiting to enter disco
+Client 4 ( vip ) entering the disco
+Client 4 ( vip ) dancing in disco
+Client 9 ( vip ) waiting on the queue
+Client 7 ( vip ) entering the disco
+Client 7 ( vip ) dancing in disco
+Client 9 ( vip ) entering the disco
+Client 9 ( vip ) dancing in disco
+Client 6 (not vip) waiting on the queue
+Client 1 (not vip) waiting on the queue
+Client 5 (not vip) waiting on the queue
+Client 8 (not vip) waiting on the queue
+Client 7 ( vip ) exits the disco
+Client 6 (not vip) waiting on the queue
+Client 5 (not vip) waiting on the queue
+Client 1 (not vip) waiting on the queue
+Client 8 (not vip) waiting on the queue
+Client 4 ( vip ) exits the disco
+Client 9 ( vip ) exits the disco
+Client 6 (not vip) waiting on the queue
+Client 5 (not vip) waiting on the queue
+Client 1 (not vip) waiting on the queue
+Client 8 (not vip) waiting on the queue
+Cleaning...
+Done! ...

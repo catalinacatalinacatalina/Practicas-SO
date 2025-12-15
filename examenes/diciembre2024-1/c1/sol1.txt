@@ -1,0 +1,27 @@
+Numero de clientes: 10
+Client  0 (not vip) dancing in disco
+Client  1 (not vip) dancing in disco
+Client  2 (  vip  ) dancing in disco
+Client  2 (  vip  ) exit. Capacity: 2
+Client  0 (not vip) exit. Capacity: 1
+Client  1 (not vip) exit. Capacity: 0
+Cleaning...
+Done!
+Client  4 (  vip  ) dancing in disco
+Client  9 (  vip  ) dancing in disco
+Client  7 (  vip  ) dancing in disco
+Client  4 (  vip  ) exit. Capacity: 2
+Client  7 (  vip  ) exit. Capacity: 1
+Client  9 (  vip  ) exit. Capacity: 0
+Cleaning...
+Done!
+Client  3 (not vip) dancing in disco
+Client  5 (not vip) dancing in disco
+Client  6 (not vip) dancing in disco
+Client  5 (not vip) exit. Capacity: 2
+Client  6 (not vip) exit. Capacity: 1
+Client  3 (not vip) exit. Capacity: 0
+Cleaning...
+Done!
+Client  8 (not vip) dancing in disco
+Client  8 (not vip) exit. Capacity: 0
