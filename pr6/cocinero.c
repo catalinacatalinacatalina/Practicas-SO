@@ -1,91 +1,114 @@
-#define _POSIX_C_SOURCE 200809L //WSL
-
+#define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <signal.h>
-
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <unistd.h>
-#include <string.h>
-#include <errno.h>
+#include <fcntl.h>
 #include <semaphore.h>
-#include <sys/types.h>
-
+#include <sys/mman.h>
+#include <signal.h>
+#include <errno.h>
+#include "globals.h"
 
 #define M 10
 #define SHM_NAME "/caldero_shm"
+
 #define SEM_MUTEX "/sem_mutex"
 #define SEM_COCINAR "/sem_cocinar"
-#define SEM_LLENO "/sem_lleno"
+#define SEM_SAVAGES "/sem_savages"
 
-int finish = 0;
-int *raciones;
-int shm_fd;
-sem_t *mutex, *sem_cocinar, *sem_lleno;
+volatile sig_atomic_t finish = 0;
 
-void limpiar() {
-    sem_close(mutex);
-    sem_close(sem_cocinar);
-    sem_close(sem_lleno);
-    sem_unlink(SEM_MUTEX);
-    sem_unlink(SEM_COCINAR);
-    sem_unlink(SEM_LLENO);
-    shm_unlink(SHM_NAME);
-}
+shared_t *shared;
+sem_t *mutex, *cook_sem, *sav_sem;
 
-void handler(int signo) {
+/* ---------- señales ---------- */
+void handler(int sig) {
     finish = 1;
-    printf("\n[COCINERO %d] Recibida señal %d, limpiando recursos y saliendo...\n", getpid(), signo);
-    limpiar();
-    exit(EXIT_SUCCESS);
 }
 
-void putServingsInPot() {
-    printf("[COCINERO] Llenando el caldero con %d raciones.\n", M);
-    *raciones = M;
-    sem_post(sem_lleno);
+/* ---------- función original (NO cambiada) ---------- */
+void putServingsInPot(void) {
+    /* mutex interruptible */
+    while (sem_wait(mutex) == -1 && errno == EINTR) {
+        if (finish) return;
+    }
+
+    /* si otro cocinero ya cocinó, dormir */
+    while (shared->servings > 0 && !finish) {
+        shared->cook_waiting++;
+        sem_post(mutex);
+
+        while (sem_wait(cook_sem) == -1 && errno == EINTR) {
+            if (finish) return;
+        }
+
+        while (sem_wait(mutex) == -1 && errno == EINTR) {
+            if (finish) return;
+        }
+    }
+
+    if (finish) {
+        sem_post(mutex);
+        return;
+    }
+
+    /* cocinar */
+    shared->servings = M;
+    printf("[COCINERO %d] Caldero lleno (%d raciones)\n", getpid(), M);
+
+    /* despertar a todos los salvajes */
+    while (shared->sav_waiting > 0) {
+        sem_post(sav_sem);
+        shared->sav_waiting--;
+    }
+
+    /* despertar a otro cocinero si hay */
+    if (shared->cook_waiting > 0) {
+        shared->cook_waiting--;
+        sem_post(cook_sem);
+    }
+
+    sem_post(mutex);
 }
 
-
-int main(int argc, char *argv[]) {
+int main(void) {
     signal(SIGINT, handler);
     signal(SIGTERM, handler);
 
+    mutex    = sem_open(SEM_MUTEX,   O_CREAT, 0666, 1);
+    cook_sem = sem_open(SEM_COCINAR,    O_CREAT, 0666, 0);
+    sav_sem  = sem_open(SEM_SAVAGES, O_CREAT, 0666, 0);
+
+    if (mutex == SEM_FAILED || cook_sem == SEM_FAILED || sav_sem == SEM_FAILED) {
+        perror("sem_open");
+        exit(1);
+    }
+
     int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-    if (shm_fd == -1) {
-        perror("[COCINERO] Error al crear memoria compartida");
-        exit(1);
-    }
+    ftruncate(shm_fd, sizeof(shared_t));
 
-    if (ftruncate(shm_fd, sizeof(int)) == -1) {
-        perror("[COCINERO] Error al truncar memoria compartida");
-        exit(1);
-    }
+    shared = mmap(NULL, sizeof(shared_t),
+                  PROT_READ | PROT_WRITE,
+                  MAP_SHARED, shm_fd, 0);
 
-    raciones = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (raciones == MAP_FAILED) {
-        perror("[COCINERO] Error al mapear memoria compartida");
-        exit(1);
-    }
+    sem_wait(mutex);
+    shared->servings = 0;
+    shared->sav_waiting = 0;
+    shared->cook_waiting = 0;
+    sem_post(mutex);
 
-    sem_cocinar = sem_open(SEM_COCINAR, O_CREAT, 0666, 0);
-    sem_lleno = sem_open(SEM_LLENO, O_CREAT, 0666, 0);
-    mutex = sem_open(SEM_MUTEX, O_CREAT, 0666, 1);
+    printf("[COCINERO %d] Listo\n", getpid());
 
-    if (sem_cocinar == SEM_FAILED || sem_lleno == SEM_FAILED || mutex == SEM_FAILED) {
-        perror("[COCINERO] Error al crear semáforos");
-        limpiar();
-        exit(1);
-    }
+    while (!finish) {
+        while (sem_wait(cook_sem) == -1 && errno == EINTR) {
+            if (finish) break;
+        }
+        if (finish) break;
 
-    printf("[COCINERO] Recursos creados. Esperando solicitudes...\n");
-    while (1) {
-        sem_wait(sem_cocinar);
         putServingsInPot();
     }
 
+    printf("[COCINERO %d] Finalizando\n", getpid());
     return 0;
 }
