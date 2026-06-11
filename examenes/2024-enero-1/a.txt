@@ -1,0 +1,4 @@
+ls -l -t
+echo "comando1"
+echo "comando2"
+echo "comando3"

@@ -1,0 +1,3 @@
+echo "comando 1" &
+echo "comando 2"
+echo "comando 3" &

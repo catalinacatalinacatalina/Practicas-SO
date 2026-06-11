@@ -1,0 +1,32 @@
+User 0 (student) waiting on the queue.
+User 0 (student) is reading books for 2 seconds.
+User 1 (student) waiting on the queue.
+User  1 (student) is reading books for 2 seconds.
+User 2 (student) waiting on the queue.
+User  2 (student) is reading books for 2 seconds.
+User 3 (student) waiting on the queue.
+User 4 (student) waiting on the queue.
+User 5 (professor) waiting on the queue.
+User 6 (professor) waiting on the queue.
+User 7 (professor) waiting on the queue.
+User 8 (student) waiting on the queue.
+User 9 (student) waiting on the queue.
+User  1 (student) leaves the library.
+User  5 (professor) is reading books for 2 seconds.
+User  2 (student) leaves the library.
+User  6 (professor) is reading books for 2 seconds.
+User  0 (student) leaves the library.
+User  7 (professor) is reading books for 2 seconds.
+User  5 (professor) leaves the library.
+User  3 (student) is reading books for 2 seconds.
+User  6 (professor) leaves the library.
+User  4 (student) is reading books for 2 seconds.
+User  7 (professor) leaves the library.
+User  8 (student) is reading books for 2 seconds.
+Library is closing for vacation.
+User  8 (student) leaves the library.
+User  4 (student) leaves the library.
+User  3 (student) leaves the library.
+Library is now open after vacation.
+User  9 (student) is reading books for 2 seconds.
+User  9 (student) leaves the library.
